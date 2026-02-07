@@ -43,7 +43,14 @@ export const NewsView: React.FC<NewsViewProps> = ({ user }) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const hasReg = formData.get('hasRegistration') === 'on';
+    const categoryValue = formData.get('category') as string;
     
+    // Ensure type safety
+    let category: NewsPost['category'] = 'Update';
+    if (['Update', 'Event', 'Institutional', 'Recruitment', 'HR'].includes(categoryValue)) {
+        category = categoryValue as NewsPost['category'];
+    }
+
     const newPost: NewsPost = {
       id: `np${Date.now()}`,
       title: formData.get('title') as string,
@@ -51,7 +58,7 @@ export const NewsView: React.FC<NewsViewProps> = ({ user }) => {
       date: new Date().toISOString().split('T')[0],
       author: user.name,
       image: 'https://picsum.photos/seed/' + Date.now() + '/800/400',
-      category: formData.get('category') as any,
+      category: category,
       hasRegistration: hasReg,
       registrationCount: hasReg ? 0 : undefined,
       attachment: formData.get('attachment') ? 'Resource_File.pdf' : undefined // Mock attachment

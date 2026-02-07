@@ -21,7 +21,8 @@ import {
   Clapperboard,
   Tv,
   ChevronRight,
-  Zap
+  Zap,
+  FileText
 } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import { AuthUser } from '../types';
@@ -66,6 +67,17 @@ export const VideoStudioView: React.FC<VideoStudioViewProps> = ({ user }) => {
       reader.onload = (event) => setUploadedPhoto(event.target?.result as string);
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleLoadScript = () => {
+    setPrompt(
+      `Cinematic commercial for "IFTU IT EDUCATION CENTRE". 
+      Visuals: Close-up of hands efficiently processing a passport renewal, followed by a clock showing "20 Minutes Turnaround". 
+      Transition to a modern office screen displaying online forms for DV Lottery and TeleBirr payments. 
+      The administrator (reference photo) smiles reassuringly at a student while pointing to a university application result on a monitor. 
+      Text overlay: "IFTU - Empowering You Through Service". 
+      Warm, professional lighting, 4k quality.`
+    );
   };
 
   const handleGenerateVideo = async () => {
@@ -374,9 +386,14 @@ export const VideoStudioView: React.FC<VideoStudioViewProps> = ({ user }) => {
             </div>
 
             <div className="space-y-5">
-               <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] px-2 flex items-center gap-3">
-                 <MessageSquare size={16} className="text-sky-500" /> Cinematic Script
-               </label>
+               <div className="flex justify-between items-center px-2">
+                  <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-3">
+                    <MessageSquare size={16} className="text-sky-500" /> Cinematic Script
+                  </label>
+                  <button onClick={handleLoadScript} className="flex items-center gap-1 text-[9px] font-bold text-[#0090C1] bg-sky-50 px-3 py-1.5 rounded-lg border border-sky-100 hover:bg-sky-100 transition-all">
+                     <FileText size={10} /> Load IFTU Script
+                  </button>
+               </div>
                <textarea 
                  value={prompt}
                  onChange={(e) => setPrompt(e.target.value)}

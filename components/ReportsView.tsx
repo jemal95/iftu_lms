@@ -4,7 +4,6 @@ import {
   Users, 
   Download, 
   ArrowUpRight, 
-  ArrowDownRight, 
   Loader2, 
   Activity, 
   Server, 
@@ -12,7 +11,15 @@ import {
   BookOpen,
   GraduationCap,
   FileSpreadsheet,
-  Printer
+  Printer,
+  PieChart as PieIcon,
+  BarChart3,
+  Calendar,
+  ChevronDown,
+  Briefcase,
+  Award,
+  CheckCircle2,
+  Filter
 } from 'lucide-react';
 import { 
   XAxis, 
@@ -24,64 +31,89 @@ import {
   Area,
   Pie,
   Cell,
-  PieChart as RePieChart
+  PieChart as RePieChart,
+  BarChart,
+  Bar,
+  Legend
 } from 'recharts';
-import { AuthUser } from '../types';
+import { AuthUser, User } from '../types';
 import { db } from '../utils/persistence';
+import { Signature } from './Signature';
 
 interface ReportsViewProps {
   user: AuthUser;
 }
 
-const ENROLLMENT_DATA = [
-  { month: 'Jan', students: 4200 },
-  { month: 'Feb', students: 4800 },
-  { month: 'Mar', students: 5100 },
-  { month: 'Apr', students: 4900 },
-  { month: 'May', students: 5800 },
-  { month: 'Jun', students: 6200 },
-];
-
-const CATEGORY_DISTRIBUTION = [
-  { name: 'Engineering', value: 45, color: '#0090C1' },
-  { name: 'Social Sci', value: 25, color: '#6366f1' },
-  { name: 'Medical', value: 20, color: '#10b981' },
-  { name: 'Others', value: 10, color: '#f59e0b' },
-];
+type ReportType = 
+  | 'STUDENT_ENROLLMENT_STATS' 
+  | 'STUDENT_ROSTER_G9_12' 
+  | 'TVET_G12_COMPLETION'
+  | 'FACULTY_FULL_INFO'
+  | 'FACULTY_STATS';
 
 export const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [stats, setStats] = useState(db.getSystemStats());
-  const [activeTab, setActiveTab] = useState<'Students' | 'Teachers' | 'Subjects'>('Students');
+  const [activeReport, setActiveReport] = useState<ReportType>('STUDENT_ENROLLMENT_STATS');
   const [isMounted, setIsMounted] = useState(false);
 
   // Load Data
   const allUsers = useMemo(() => db.getUsers(), []);
   const allCourses = useMemo(() => db.getCourses(), []);
+  const stats = useMemo(() => db.getSystemStats(), []);
   
   const teachers = useMemo(() => allUsers.filter(u => u.role === 'Teacher'), [allUsers]);
   const students = useMemo(() => allUsers.filter(u => u.role === 'Student'), [allUsers]);
 
   useEffect(() => {
-    // Ensure the layout is stable before mounting the charts
     const timer = setTimeout(() => setIsMounted(true), 150);
-    
-    const interval = setInterval(() => {
-      setStats(db.getSystemStats());
-    }, 5000);
-    
-    return () => {
-      clearTimeout(timer);
-      clearInterval(interval);
-    };
+    return () => clearTimeout(timer);
   }, []);
+
+  // --- DATA AGGREGATION LOGIC ---
+
+  // 1. Enrollment Stats by Grade/Gender
+  const enrollmentStats = useMemo(() => {
+    const grades = ['Grade 9', 'Grade 10', 'Grade 11', 'Grade 12'];
+    return grades.map(g => {
+      const cohort = students.filter(s => s.currentGrade === g);
+      return {
+        name: g,
+        Male: cohort.filter(s => s.gender === 'Male').length,
+        Female: cohort.filter(s => s.gender === 'Female').length,
+        Total: cohort.length
+      };
+    });
+  }, [students]);
+
+  // 2. TVET vs Completion Stats
+  const tvetStats = useMemo(() => {
+    const tvet = students.filter(s => s.currentGrade?.includes('Level'));
+    const g12 = students.filter(s => s.currentGrade === 'Grade 12');
+    return [
+      { name: 'TVET (L1-4)', value: tvet.length, color: '#f59e0b' },
+      { name: 'Grade 12', value: g12.length, color: '#0090C1' }
+    ];
+  }, [students]);
+
+  // 3. Faculty Qualification Stats
+  const facultyStats = useMemo(() => {
+    const quals: Record<string, number> = {};
+    teachers.forEach(t => {
+      const q = t.qualification || 'Other';
+      quals[q] = (quals[q] || 0) + 1;
+    });
+    return Object.entries(quals).map(([name, val]) => ({ name, value: val }));
+  }, [teachers]);
 
   const exportToCSV = (data: any[], fileName: string) => {
     if (data.length === 0) return;
     const headers = Object.keys(data[0]);
     const csvRows = [
       headers.join(','),
-      ...data.map(row => headers.map(header => `"${row[header] || ''}"`).join(','))
+      ...data.map(row => headers.map(header => {
+        const val = row[header];
+        return typeof val === 'object' ? `"${JSON.stringify(val).replace(/"/g, '""')}"` : `"${val}"`;
+      }).join(','))
     ];
     const csvContent = '\uFEFF' + csvRows.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -93,203 +125,316 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
 
   const handleDownloadPDF = async () => {
     setIsGenerating(true);
-    const element = document.getElementById('report-content');
+    const element = document.getElementById('printable-report-content');
     if (element && (window as any).html2pdf) {
       const opt = {
-        margin: [0.2, 0.2],
-        filename: `IFTU_Full_Institutional_Report_${new Date().toISOString().split('T')[0]}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
+        margin: [0.3, 0.3],
+        filename: `IFTU_Report_${activeReport}.pdf`,
+        image: { type: 'jpeg', quality: 1.0 },
         html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
       };
-      try { await (window as any).html2pdf().set(opt).from(element).save(); }
-      catch (error) { alert("PDF Generation failed."); }
+      try {
+        await (window as any).html2pdf().set(opt).from(element).save();
+      } catch (error) {
+        console.error(error);
+        alert("PDF Generation failed.");
+      }
     }
     setIsGenerating(false);
   };
 
   return (
-    <div className="p-8 space-y-10 animate-in fade-in duration-500" id="report-content">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6" data-html2canvas-ignore="true">
+    <div className="p-8 space-y-10 animate-in fade-in duration-500">
+      {/* Header & Selector */}
+      <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">Executive Intelligence</h2>
-          <p className="text-sm text-slate-500 mt-1 font-medium">Full database visualization and multi-format exports.</p>
+          <h2 className="text-4xl font-black text-slate-800 tracking-tighter">Institutional Intelligence</h2>
+          <p className="text-sm text-slate-500 mt-2 font-bold uppercase tracking-widest flex items-center gap-2">
+             <Activity size={16} className="text-[#0090C1]" /> 2018 E.C. Academic Pulse
+          </p>
         </div>
-        <div className="flex gap-4">
-           <button 
-             onClick={handleDownloadPDF}
-             disabled={isGenerating}
-             className="flex items-center gap-2 px-8 py-4 bg-[#0090C1] text-white rounded-2xl font-bold shadow-2xl shadow-sky-500/20 hover:bg-[#007ba6] transition-all disabled:opacity-75 disabled:cursor-wait"
-           >
-             {isGenerating ? <Loader2 size={20} className="animate-spin" /> : <Printer size={20} />}
-             {isGenerating ? 'Synthesizing...' : 'Export Comprehensive PDF'}
-           </button>
+        
+        <div className="flex flex-wrap gap-4 items-center">
+          <div className="relative min-w-[280px]">
+            <select 
+              value={activeReport} 
+              onChange={(e) => setActiveReport(e.target.value as ReportType)}
+              className="w-full pl-12 pr-10 py-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-700 shadow-xl shadow-slate-100 appearance-none focus:ring-4 focus:ring-sky-500/5 transition-all"
+            >
+              <optgroup label="Student Reports">
+                <option value="STUDENT_ENROLLMENT_STATS">1. Enrollment Statistics</option>
+                <option value="STUDENT_ROSTER_G9_12">2. Roster (Grade 9-12)</option>
+                <option value="TVET_G12_COMPLETION">3. TVET & G12 Completion</option>
+              </optgroup>
+              <optgroup label="Teacher Reports">
+                <option value="FACULTY_FULL_INFO">4. Staff Full Information</option>
+                <option value="FACULTY_STATS">5. Staff Statistics</option>
+              </optgroup>
+            </select>
+            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
+            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-[#0090C1]" size={20} />
+          </div>
+
+          <button 
+            onClick={handleDownloadPDF}
+            disabled={isGenerating}
+            className="flex items-center gap-3 px-8 py-4 bg-[#0090C1] text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-2xl shadow-sky-500/20 hover:bg-[#007ba6] transition-all active:scale-95 disabled:opacity-50"
+          >
+            {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Printer size={18} />}
+            {isGenerating ? 'Compiling...' : 'Print Report'}
+          </button>
         </div>
       </div>
 
-      {/* Summary Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-        <ReportMetricCard title="Total Students" value={stats.students.toLocaleString()} change="+12%" isPositive={true} icon={<GraduationCap size={20} />} color="sky" />
-        <ReportMetricCard title="Faculty Count" value={stats.teachers.toLocaleString()} change="+5%" isPositive={true} icon={<Users size={20} />} color="emerald" />
-        <ReportMetricCard title="Live Subjects" value={stats.subjects.toLocaleString()} change="+2" isPositive={true} icon={<BookOpen size={20} />} color="amber" />
-        <ReportMetricCard title="Total Enrollment" value={stats.totalEnrollment.toLocaleString()} change="+8%" isPositive={true} icon={<Activity size={20} />} color="indigo" />
-      </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        {/* Analytics Section */}
-        <div className="xl:col-span-2 space-y-8">
-          <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm p-10 space-y-10">
-            <div className="flex items-center justify-between">
+      {/* Main Report Viewport */}
+      <div id="printable-report-content" className="bg-white rounded-[3.5rem] border border-slate-100 shadow-2xl shadow-slate-200/50 overflow-hidden min-h-[600px] flex flex-col p-10">
+        
+        {/* Report Header (For Print and Screen) */}
+        <div className="mb-10 flex flex-col md:flex-row items-center justify-between gap-6 border-b border-slate-100 pb-10">
+           <div className="flex items-center gap-6">
+              <div className="w-20 h-20 bg-slate-900 rounded-[2rem] flex items-center justify-center text-white shadow-2xl">
+                 <BarChart3 size={36} />
+              </div>
               <div>
-                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Growth Analytics</h3>
-                <p className="text-xs text-slate-400 font-medium">Enrollment trends from institutional history.</p>
+                 <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight">IFTU LMS OFFICIAL REPORT</h1>
+                 <p className="text-sm font-bold text-slate-400 uppercase tracking-[0.3em] mt-1">
+                    {activeReport.replace(/_/g, ' ')}
+                 </p>
               </div>
-            </div>
-            <div className="h-[340px] w-full block relative">
-              {isMounted && (
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                  <AreaChart data={ENROLLMENT_DATA}>
-                    <defs><linearGradient id="colorStudentsRep" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#0090C1" stopOpacity={0.2}/><stop offset="95%" stopColor="#0090C1" stopOpacity={0}/></linearGradient></defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8', fontWeight: 700}} dy={15} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#94a3b8', fontWeight: 700}} />
-                    <Tooltip contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)', padding: '16px'}} />
-                    <Area type="monotone" dataKey="students" stroke="#0090C1" strokeWidth={5} fillOpacity={1} fill="url(#colorStudentsRep)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </div>
-
-          {/* Detailed Data Hub */}
-          <div className="bg-white rounded-[3rem] border border-slate-100 shadow-xl overflow-hidden flex flex-col">
-            <div className="p-8 bg-slate-50/50 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="flex gap-2">
-                {(['Students', 'Teachers', 'Subjects'] as const).map(tab => (
-                  <button 
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                      activeTab === tab ? 'bg-[#0090C1] text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-100'
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                ))}
+           </div>
+           <div className="text-right flex flex-col items-end">
+              <div className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100 mb-2">
+                 <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Status: Verified Official</span>
               </div>
-              <button 
-                onClick={() => exportToCSV(activeTab === 'Students' ? students : activeTab === 'Teachers' ? teachers : allCourses, `IFTU_${activeTab}`)}
-                className="flex items-center gap-2 px-6 py-2.5 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 shadow-lg shadow-emerald-500/10 active:scale-95 transition-all"
-              >
-                <FileSpreadsheet size={16} /> Export {activeTab} Excel
-              </button>
-            </div>
-
-            <div className="overflow-x-auto max-h-[500px]">
-              <table className="w-full text-left">
-                <thead className="bg-white sticky top-0 z-10 text-slate-400 text-[9px] uppercase font-black tracking-widest border-b border-slate-100">
-                  <tr>
-                    {activeTab === 'Subjects' ? (
-                      <>
-                        <th className="px-8 py-4">Title</th>
-                        <th className="px-8 py-4">Category</th>
-                        <th className="px-8 py-4">Instructor</th>
-                        <th className="px-8 py-4">Enrollment</th>
-                      </>
-                    ) : (
-                      <>
-                        <th className="px-8 py-4">Full Name</th>
-                        <th className="px-8 py-4">ID / Email</th>
-                        <th className="px-8 py-4">Department</th>
-                        <th className="px-8 py-4">Status</th>
-                      </>
-                    )}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {activeTab === 'Subjects' ? (
-                    allCourses.map(course => (
-                      <tr key={course.id} className="text-xs font-medium hover:bg-slate-50/30">
-                        <td className="px-8 py-4 font-bold text-slate-800">{course.title}</td>
-                        <td className="px-8 py-4 text-slate-500">{course.category}</td>
-                        <td className="px-8 py-4 text-slate-500">{course.instructor}</td>
-                        <td className="px-8 py-4 text-slate-500 font-bold">{course.students}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    (activeTab === 'Students' ? students : teachers).map(p => (
-                      <tr key={p.id} className="text-xs font-medium hover:bg-slate-50/30">
-                        <td className="px-8 py-4 font-bold text-slate-800">{p.name}</td>
-                        <td className="px-8 py-4 text-slate-500">{p.email}</td>
-                        <td className="px-8 py-4 text-slate-500">{p.department}</td>
-                        <td className="px-8 py-4">
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${
-                            p.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'
-                          }`}>
-                            {p.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+              <p className="text-xs font-bold text-slate-400">{new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+           </div>
         </div>
 
-        {/* Sidebar Cards */}
-        <div className="space-y-8">
-          <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm p-10 flex flex-col items-center justify-between space-y-10 text-center">
-             <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Department Mix</h3>
-             <div className="h-[240px] w-full block relative">
-                {isMounted && (
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                    <RePieChart>
-                      <Pie data={CATEGORY_DISTRIBUTION} innerRadius={70} outerRadius={90} paddingAngle={10} dataKey="value" stroke="none">
-                        {CATEGORY_DISTRIBUTION.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                      </Pie>
-                      <Tooltip />
-                    </RePieChart>
-                  </ResponsiveContainer>
-                )}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                   <h4 className="text-3xl font-black text-slate-800">45%</h4>
-                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Engineering</p>
-                </div>
-             </div>
-             <div className="w-full space-y-3">
-                {CATEGORY_DISTRIBUTION.map(c => (
-                  <div key={c.name} className="flex items-center justify-between">
-                     <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c.color }} /><span className="text-[10px] font-bold text-slate-600">{c.name}</span></div>
-                     <span className="text-[10px] font-black text-slate-800">{c.value}%</span>
+        {/* Report Content Switcher */}
+        <div className="flex-1">
+          {activeReport === 'STUDENT_ENROLLMENT_STATS' && (
+            <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4">
+               <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 h-[400px]">
+                  <div className="space-y-6">
+                     <h3 className="text-xl font-black text-slate-800 flex items-center gap-3"><Users size={24} className="text-[#0090C1]" /> Enrollment Comparison</h3>
+                     <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={enrollmentStats}>
+                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fontWeight: 700}} />
+                           <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fontWeight: 700}} />
+                           <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)'}} />
+                           <Legend />
+                           <Bar dataKey="Male" fill="#0090C1" radius={[8, 8, 0, 0]} />
+                           <Bar dataKey="Female" fill="#10b981" radius={[8, 8, 0, 0]} />
+                        </BarChart>
+                     </ResponsiveContainer>
                   </div>
-                ))}
-             </div>
-          </div>
+                  <div className="overflow-x-auto">
+                     <table className="w-full text-left border-collapse rounded-2xl overflow-hidden">
+                        <thead>
+                           <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b">
+                              <th className="px-6 py-4">Grade Level</th>
+                              <th className="px-6 py-4 text-center">Male</th>
+                              <th className="px-6 py-4 text-center">Female</th>
+                              <th className="px-6 py-4 text-right">Total</th>
+                           </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                           {enrollmentStats.map(row => (
+                              <tr key={row.name} className="hover:bg-slate-50 transition-colors">
+                                 <td className="px-6 py-4 font-black text-slate-700">{row.name}</td>
+                                 <td className="px-6 py-4 text-center text-slate-500 font-bold">{row.Male}</td>
+                                 <td className="px-6 py-4 text-center text-slate-500 font-bold">{row.Female}</td>
+                                 <td className="px-6 py-4 text-right text-[#0090C1] font-black">{row.Total}</td>
+                              </tr>
+                           ))}
+                           <tr className="bg-slate-50/50 font-black">
+                              <td className="px-6 py-6 uppercase text-xs">Total Enrollment</td>
+                              <td colSpan={3} className="px-6 py-6 text-right text-2xl text-slate-900">{students.length}</td>
+                           </tr>
+                        </tbody>
+                     </table>
+                  </div>
+               </div>
+            </div>
+          )}
 
-          <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl">
-             <div className="absolute top-0 right-0 p-8 opacity-10"><Server size={100} /></div>
-             <div className="relative z-10 space-y-6">
-                <h4 className="text-xs font-black text-sky-400 uppercase tracking-widest">System Health</h4>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="opacity-50">Storage Usage</span>
-                    <span className="font-bold">{stats.storageUsage}</span>
+          {activeReport === 'STUDENT_ROSTER_G9_12' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+               <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse border border-slate-100">
+                     <thead>
+                        <tr className="bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest">
+                           <th className="px-6 py-4 border-r border-white/10">ID</th>
+                           <th className="px-6 py-4 border-r border-white/10">Full Name</th>
+                           <th className="px-6 py-4 border-r border-white/10 text-center">Sex</th>
+                           <th className="px-6 py-4 border-r border-white/10">Current Grade</th>
+                           <th className="px-6 py-4 border-r border-white/10">Department</th>
+                           <th className="px-6 py-4 text-center">Status</th>
+                        </tr>
+                     </thead>
+                     <tbody className="divide-y divide-slate-100">
+                        {students.filter(s => s.currentGrade?.startsWith('Grade')).map(s => (
+                           <tr key={s.id} className="hover:bg-slate-50 transition-colors text-sm">
+                              <td className="px-6 py-4 font-mono text-xs font-bold text-slate-400">{s.id}</td>
+                              <td className="px-6 py-4 font-black text-slate-800">{s.name}</td>
+                              <td className="px-6 py-4 text-center font-bold text-slate-500">{s.gender?.charAt(0) || 'M'}</td>
+                              <td className="px-6 py-4"><span className="px-3 py-1 bg-sky-50 text-[#0090C1] rounded-lg font-bold text-xs">{s.currentGrade}</span></td>
+                              <td className="px-6 py-4 text-slate-500 font-medium">{s.department}</td>
+                              <td className="px-6 py-4 text-center">
+                                 <span className="text-[10px] font-black uppercase text-emerald-500">Active</span>
+                              </td>
+                           </tr>
+                        ))}
+                     </tbody>
+                  </table>
+               </div>
+            </div>
+          )}
+
+          {activeReport === 'TVET_G12_COMPLETION' && (
+            <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                  <div className="bg-slate-50 rounded-[2.5rem] p-10 flex flex-col items-center">
+                     <h3 className="text-lg font-black text-slate-800 uppercase tracking-widest mb-8">Program Breakdown</h3>
+                     <div className="h-[280px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                           <RePieChart>
+                              <Pie data={tvetStats} innerRadius={70} outerRadius={100} paddingAngle={10} dataKey="value" stroke="none">
+                                 {tvetStats.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                              </Pie>
+                              <Tooltip contentStyle={{borderRadius: '16px', border: 'none'}} />
+                              <Legend />
+                           </RePieChart>
+                        </ResponsiveContainer>
+                     </div>
                   </div>
-                  <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                    <div className="h-full bg-sky-500" style={{ width: '12%' }} />
+                  <div className="space-y-8">
+                     <div className="bg-white border-2 border-slate-100 rounded-3xl p-8 flex items-center justify-between">
+                        <div>
+                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Total TVET Candidates</p>
+                           <h4 className="text-4xl font-black text-amber-600 mt-2">{students.filter(s => s.currentGrade?.includes('Level')).length}</h4>
+                        </div>
+                        <Award size={48} className="text-amber-200" />
+                     </div>
+                     <div className="bg-white border-2 border-slate-100 rounded-3xl p-8 flex items-center justify-between">
+                        <div>
+                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Grade 12 Graduates (Pending)</p>
+                           <h4 className="text-4xl font-black text-[#0090C1] mt-2">{students.filter(s => s.currentGrade === 'Grade 12').length}</h4>
+                        </div>
+                        <GraduationCap size={48} className="text-sky-200" />
+                     </div>
+                     <div className="p-6 bg-blue-50 rounded-2xl border border-blue-100">
+                        <p className="text-xs font-bold text-blue-700 leading-relaxed italic flex items-start gap-3">
+                           <CheckCircle2 size={16} className="shrink-0 mt-0.5" />
+                           Completion Eligibility: Students are flagged for graduation once all Semester 1 and 2 records are synchronized in the registry.
+                        </p>
+                     </div>
                   </div>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="opacity-50">State Verification</span>
-                    <span className="font-bold text-emerald-400">PASSED</span>
+               </div>
+            </div>
+          )}
+
+          {activeReport === 'FACULTY_FULL_INFO' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+               <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse border border-slate-100">
+                     <thead className="bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest border-b">
+                        <tr>
+                           <th className="px-6 py-4 border-r">Employee Name</th>
+                           <th className="px-6 py-4 border-r">Qualification</th>
+                           <th className="px-6 py-4 border-r">Employment Type</th>
+                           <th className="px-6 py-4 border-r">Department</th>
+                           <th className="px-6 py-4 border-r">Assignments</th>
+                           <th className="px-6 py-4">Campus/Station</th>
+                        </tr>
+                     </thead>
+                     <tbody className="divide-y divide-slate-100 text-xs">
+                        {teachers.map(t => (
+                           <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                              <td className="px-6 py-4 font-black text-slate-800 uppercase tracking-tight">{t.name}</td>
+                              <td className="px-6 py-4 font-bold text-[#0090C1]">{t.qualification || 'BSc/BA'}</td>
+                              <td className="px-6 py-4">
+                                 <span className="px-2 py-1 bg-white border border-slate-200 rounded font-bold text-slate-500 uppercase">{t.employmentType || 'Full-time'}</span>
+                              </td>
+                              <td className="px-6 py-4 text-slate-600 font-medium">{t.department}</td>
+                              <td className="px-6 py-4">
+                                 <div className="flex flex-wrap gap-1">
+                                    {t.assignedSubjects?.map(s => <span key={s} className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[9px] font-black">{s}</span>)}
+                                 </div>
+                              </td>
+                              <td className="px-6 py-4 font-bold text-slate-500">{t.campusId === 'S1' ? 'Central Hub' : 'Branch Hub'}</td>
+                           </tr>
+                        ))}
+                     </tbody>
+                  </table>
+               </div>
+            </div>
+          )}
+
+          {activeReport === 'FACULTY_STATS' && (
+            <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4">
+               <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                  <div className="lg:col-span-2 space-y-6">
+                     <h3 className="text-lg font-black text-slate-800 uppercase tracking-widest flex items-center gap-3"><Briefcase size={24} className="text-emerald-500" /> Staffing Velocity</h3>
+                     <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                           <BarChart data={facultyStats} layout="vertical">
+                              <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f1f5f9" />
+                              <XAxis type="number" hide />
+                              <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 900}} width={100} />
+                              <Tooltip cursor={{fill: '#f0fdf4'}} contentStyle={{borderRadius: '12px', border: 'none'}} />
+                              <Bar dataKey="value" fill="#10b981" radius={[0, 10, 10, 0]} label={{ position: 'right', fontSize: 10, fontWeight: 900 }} />
+                           </BarChart>
+                        </ResponsiveContainer>
+                     </div>
                   </div>
-                </div>
-                <div className="pt-4 flex items-center gap-2 text-[9px] font-black opacity-30 uppercase tracking-[0.2em]">
-                   <Clock size={12} /> Last Sync: {stats.lastSync}
-                </div>
-             </div>
-          </div>
+                  <div className="space-y-6 bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden">
+                     <div className="absolute top-0 right-0 p-8 opacity-10"><Activity size={100} /></div>
+                     <div className="relative z-10 space-y-8">
+                        <div>
+                           <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em]">Total Faculty</p>
+                           <h4 className="text-5xl font-black mt-2">{teachers.length}</h4>
+                        </div>
+                        <div className="space-y-4">
+                           <div className="flex justify-between items-center text-xs font-bold">
+                              <span className="opacity-60">Avg. Subject Load</span>
+                              <span className="text-sky-400">2.4 Per Staff</span>
+                           </div>
+                           <div className="flex justify-between items-center text-xs font-bold">
+                              <span className="opacity-60">Certification Rate</span>
+                              <span className="text-emerald-400">100%</span>
+                           </div>
+                        </div>
+                        <div className="pt-8 border-t border-white/10">
+                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Latest Faculty Update</p>
+                           <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl">
+                              <Clock size={16} className="text-sky-400" />
+                              <span className="text-xs font-medium opacity-80">Roster Synchronized {stats.lastSync}</span>
+                           </div>
+                        </div>
+                     </div>
+                  </div>
+               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer with Signatures */}
+        <div className="mt-16 pt-12 border-t border-slate-100 flex justify-between items-end">
+           <div className="space-y-2">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Prepared by Registry</p>
+              <div className="w-48 h-px bg-slate-200" />
+           </div>
+           <div className="text-center">
+              <Signature className="w-32 h-12 text-slate-800 mb-2 mx-auto" />
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-900 underline">Authorized System Director</p>
+           </div>
+           <div className="text-right">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Official IFTU LMS Seal</p>
+              <div className="w-12 h-12 bg-slate-100 rounded-full inline-flex items-center justify-center text-slate-300 mt-2 rotate-12 border-2 border-dashed border-slate-200"><Activity size={24} /></div>
+           </div>
         </div>
       </div>
     </div>
@@ -301,11 +446,11 @@ const ReportMetricCard: React.FC<{ title: string; value: string; change: string;
     sky: 'bg-sky-50 text-sky-600', emerald: 'bg-emerald-50 text-emerald-600', amber: 'bg-amber-50 text-amber-600', indigo: 'bg-indigo-50 text-indigo-600',
   };
   return (
-    <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-2xl transition-all group hover:-translate-y-1">
+    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl transition-all group hover:-translate-y-1">
       <div className="flex items-center justify-between mb-8">
         <div className={`p-4 rounded-2xl transition-all duration-500 group-hover:rotate-12 ${colorMap[color]}`}>{icon}</div>
         <div className={`flex items-center gap-1 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${isPositive ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-500'}`}>
-          {isPositive ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}{change}
+          {isPositive ? <ArrowUpRight size={14} /> : <ArrowUpRight size={14} className="rotate-90" />}{change}
         </div>
       </div>
       <div><p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{title}</p><h4 className="text-3xl font-black text-slate-800 mt-2 tracking-tight group-hover:text-[#0090C1] transition-colors">{value}</h4></div>

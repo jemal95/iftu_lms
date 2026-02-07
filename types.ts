@@ -1,4 +1,8 @@
 
+
+
+
+
 // Global Configuration Constants
 export const SOCIAL_LINKS = {
   TELEGRAM: 'https://t.me/jemal9056',
@@ -10,6 +14,19 @@ export const ADMIN_PROFILE = {
   NAME: 'Jemal Fano Haji',
   EMAIL: 'admin@iftu.edu'
 };
+
+export interface InstitutionalBranding {
+  bureauName: string;
+  bureauNameLocal: string;
+  zoneName: string;
+  zoneNameLocal: string;
+  woredaName: string;
+  woredaNameLocal: string;
+  schoolName: string;
+  schoolNameLocal: string;
+  academicYear: string;
+  themeColor: string;
+}
 
 export enum NavSection {
   DASHBOARD = 'DASHBOARD',
@@ -58,23 +75,18 @@ export interface User {
   avatar: string;
   department: string;
   phone?: string;
-  // Extended Profile Fields
   nationalId?: string;
   gender?: 'Male' | 'Female';
   birthday?: string;
   motherName?: string;
   address?: Address;
-  
-  // Student Specific
-  promotedGrade?: string; // Previous grade
+  promotedGrade?: string;
   currentGrade?: string;
-
-  // Teacher/Employee Specific
   qualification?: 'Diploma' | 'BSc/BA' | 'MSc/MA' | 'PhD';
   employmentType?: 'Full-time' | 'Part-time' | 'Contract';
   campusId?: string;
   assignedSubjects?: string[];
-  assignedGrades?: string[]; // e.g., ["Grade 9", "Grade 10", "Level 1"]
+  assignedGrades?: string[];
 }
 
 export interface CourseModule {
@@ -95,7 +107,7 @@ export interface Course {
   objectives?: string[];
   prerequisites?: string[];
   duration?: string;
-  campusId?: string; // Links course to a specific school/campus
+  campusId?: string;
   curriculum?: CourseModule[];
 }
 
@@ -206,7 +218,6 @@ export interface PaymentTransaction {
   type: 'Credit' | 'Debit';
 }
 
-// New Interfaces for Transcript System
 export interface SubjectGrade {
   sem1: number;
   sem2: number;
@@ -214,15 +225,24 @@ export interface SubjectGrade {
 
 export interface StudentAcademicRecord {
   studentId: string;
-  // Key is subject name (e.g., 'MATHEMATICS') - Represents Current Grade (G12)
   subjects: Record<string, SubjectGrade>; 
-  // Historical grades: Key is Grade Level (e.g., "9"), Value is Subject map
   previousGrades?: Record<number, Record<string, SubjectGrade>>;
 }
 
 declare global {
+  /**
+   * Defining AIStudio interface within the global scope to ensure consistent merging
+   * with existing environment declarations and avoid "Subsequent property declarations must have the same type" errors.
+   */
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+
   interface Window {
     html2pdf: () => any;
     webkitAudioContext: typeof AudioContext;
+    // Fix: Property 'aistudio' is made optional to align with other global declarations and resolve modifier mismatch errors.
+    aistudio?: AIStudio;
   }
 }

@@ -15,7 +15,25 @@ export class GeminiService {
         model: 'gemini-3-flash-preview',
         contents: query,
         config: {
-          systemInstruction: "You are the IFTU LMS AI Assistant. You help administrators analyze student data, suggest educational improvements, and answer technical questions. Use Google Search for news/trends. You also have the authority to generate formal Completion Certificates, Transcripts, and GPA summaries in Markdown format when requested by a student. Be formal, celebratory, and use professional formatting for these documents. Always cite URLs from grounding chunks.",
+          systemInstruction: `You are the IFTU LMS AI Assistant. 
+          
+          You also represent the 'IFTU IT EDUCATION CENTRE'. 
+          Key Services you can provide info on:
+          1. **Passport Services**: Assistance with new, renewal, and expired passports. Turnaround ~20 mins.
+          2. **Online Form Completion**: Helping with DV lotteries, E-service payments, TeleBirr, and E-money transfers.
+          3. **Student Applications**: Assisting with MoE placements, university assignments, and exam locations.
+          4. **Result Checking**: Quick access (1 min) to Passport, Grade 12/8/6 exams, and NAGT ID results.
+          5. **Training**: Educational support and digital skills training.
+          
+          Contact Info:
+          - Phone: 0995852194, 0903971666, 0715008043
+          - Telegram: t.me/jemal9056
+          - Email: jemalfano030@gmail.com
+          - Location: Near Bajaj Qoree-Shire.
+          
+          You also help administrators analyze student data and suggest educational improvements. 
+          Use Google Search for news/trends.
+          You have authority to generate formal Completion Certificates, Transcripts, and GPA summaries in Markdown.`,
           tools: [{ googleSearch: {} }],
           thinkingConfig: { thinkingBudget: 0 } // Disable thinking for fast responses
         },
@@ -58,6 +76,49 @@ export class GeminiService {
       config: { thinkingConfig: { thinkingBudget: 0 } }
     });
     return response.text;
+  }
+
+  async generateEthiopianSyllabus(subject: string, grade: string) {
+    const response = await this.ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Generate a structured syllabus for the subject "${subject}" for "${grade}" strictly following the Ethiopian Ministry of Education (MoE) curriculum standards. 
+      Break it down into Units (Modules) and Sub-topics (Lessons).
+      
+      Example structure:
+      Unit 1: Introduction to...
+       - Lesson 1
+       - Lesson 2
+      Unit 2: ...
+      
+      Ensure the content is accurate for the Ethiopian context.`,
+      config: {
+        responseMimeType: "application/json",
+        thinkingConfig: { thinkingBudget: 0 },
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              id: { type: Type.STRING }, // Just ask AI to generate a random string or index
+              title: { type: Type.STRING, description: "The Unit Name (e.g. Unit 1: Mechanics)" },
+              lessons: { 
+                type: Type.ARRAY, 
+                items: { type: Type.STRING },
+                description: "List of specific topics/lessons in this unit"
+              }
+            },
+            required: ["title", "lessons"]
+          }
+        }
+      }
+    });
+
+    try {
+      return JSON.parse(response.text?.trim() || '[]');
+    } catch (e) {
+      console.error("Failed to parse Ethiopian Curriculum", e);
+      return [];
+    }
   }
 
   async generateQuestionsFromText(sourceText: string, count: number = 5) {
