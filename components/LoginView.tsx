@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { GraduationCap, LogIn, ShieldCheck, Info, Lock, User, AlertCircle, Eye, EyeOff, ArrowRight, HelpCircle, Check } from 'lucide-react';
+import { GraduationCap, Lock, User, AlertCircle, Eye, EyeOff, ArrowRight, HelpCircle, Check, Loader2, Monitor, RefreshCw, Maximize, ChevronRight, ShieldCheck } from 'lucide-react';
 import { AuthUser, ADMIN_PROFILE } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -14,7 +14,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showInfo, setShowInfo] = useState(false);
+  const [showInfo, setShowInfo] = useState(false); 
   const [resetSent, setResetSent] = useState(false);
   const { t } = useLanguage();
 
@@ -23,9 +23,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
     setError('');
     setIsLoading(true);
 
-    // Simulate network delay
     setTimeout(() => {
-      // 1. Admin Credentials
       if (username === '_admin' && password === '_admin123') {
         const adminUser: AuthUser = {
           id: 'admin-main',
@@ -36,7 +34,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
         };
         onLogin(adminUser);
       } 
-      // 2. Teacher Credentials
       else if (username === '_teacher' && password === '_teacher123') {
         const teacherUser: AuthUser = {
           id: 'teacher-main',
@@ -47,28 +44,32 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
         };
         onLogin(teacherUser);
       }
-      // 3. Default/Guest Credentials (for Students/New Users)
       else if (username === '_Iftu' && password === '_123456') {
         const guestUser: AuthUser = {
           id: `guest-${Date.now()}`,
           name: 'New Applicant',
           email: 'guest@iftu.edu',
           avatar: 'https://picsum.photos/seed/guest/100/100',
-          role: 'Student' // Defaulting to Student view for read-only/structure access
+          role: 'Student'
         };
         onLogin(guestUser);
       } 
-      // 4. Fallback/Error
       else {
-        setError('Invalid credentials. Please check your username and password.');
+        setError('Access Denied. Verify credentials.');
         setIsLoading(false);
       }
-    }, 800);
+    }, 1200);
+  };
+
+  const handleAutoFill = (u: string, p: string) => {
+    setUsername(u);
+    setPassword(p);
+    setShowInfo(false);
   };
 
   const handleForgotPassword = () => {
     if (!username) {
-        setError('Please enter your username to reset password.');
+        setError('Enter username to reset.');
         return;
     }
     setResetSent(true);
@@ -76,127 +77,159 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-sky-100 via-slate-50 to-indigo-100 flex flex-col items-center justify-center p-6 font-sans relative overflow-hidden">
-      {/* Decorative Background Elements */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-sky-300/20 rounded-full blur-[120px] animate-pulse"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-300/20 rounded-full blur-[120px] animate-pulse delay-700"></div>
+    <div className="min-h-screen bg-[#F0F4FA] flex flex-col font-sans relative overflow-hidden text-slate-600">
+      
+      {/* Top Status Bar */}
+      <div className="h-12 bg-white/80 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-6 z-20 absolute top-0 w-full">
+         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">IFTU LMS - Modern Learning Platform</span>
+         <div className="flex items-center gap-4 text-slate-400">
+            <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-600 transition-colors">
+               <Monitor size={12} />
+               <span className="text-[10px] font-bold">Device</span>
+            </div>
+            <RefreshCw size={12} className="cursor-pointer hover:text-slate-600 transition-colors" />
+            <Maximize size={12} className="cursor-pointer hover:text-slate-600 transition-colors" />
+         </div>
       </div>
 
-      <div className="flex flex-col items-center mb-10 animate-in fade-in slide-in-from-top-6 duration-1000 text-center relative z-10">
-        <div className="w-28 h-28 bg-gradient-to-tr from-[#0090C1] to-indigo-600 rounded-[2.5rem] flex items-center justify-center text-white shadow-2xl shadow-sky-500/30 mb-6 border-[6px] border-white/20 backdrop-blur-sm transform hover:scale-105 transition-transform duration-500">
-          <GraduationCap size={56} strokeWidth={1.5} />
-        </div>
-        <h1 className="text-6xl font-black text-slate-900 tracking-tight leading-tight drop-shadow-sm">IFTU LMS</h1>
-        <p className="text-slate-500 text-lg mt-3 font-medium max-w-lg leading-relaxed tracking-wide">
-          Advanced Institutional Learning Portal
-        </p>
+      {/* Background Mesh (Subtle) */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-blue-100/40 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-sky-100/40 rounded-full blur-[100px]" />
       </div>
 
-      <div className="max-w-[440px] w-full bg-white/80 backdrop-blur-xl rounded-[3rem] shadow-2xl shadow-slate-200/50 p-10 animate-in fade-in zoom-in duration-500 border border-white/60 relative z-10">
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Secure Sign In</h2>
-          <p className="text-xs text-slate-500 mt-2 font-medium">Access your personalized dashboard.</p>
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col items-center justify-center p-6 relative z-10 space-y-8 animate-in fade-in zoom-in-95 duration-700">
+        
+        {/* Logo Section */}
+        <div className="text-center space-y-6">
+           <div className="w-24 h-24 bg-gradient-to-b from-[#3b82f6] to-[#2563eb] rounded-[2rem] flex items-center justify-center shadow-xl shadow-blue-500/20 mx-auto transform hover:scale-105 transition-transform duration-500 relative group">
+              <div className="absolute inset-0 bg-white/20 rounded-[2rem] opacity-0 group-hover:opacity-100 transition-opacity" />
+              <GraduationCap size={48} className="text-white drop-shadow-md" strokeWidth={1.5} />
+           </div>
+           <div className="space-y-1">
+              <h1 className="text-5xl font-black text-slate-900 tracking-tighter">IFTU LMS</h1>
+              <p className="text-slate-500 font-bold text-sm tracking-wide">Advanced Institutional Learning Portal</p>
+           </div>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Username / ID</label>
-            <div className="relative group">
-              <User className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0090C1] transition-colors" size={20} />
-              <input 
-                type="text" 
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="e.g. _Iftu"
-                className="w-full pl-14 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-sky-500/10 focus:border-[#0090C1] transition-all font-bold text-slate-700 text-sm placeholder:font-medium placeholder:text-slate-300"
-              />
-            </div>
-          </div>
+        {/* Login Card */}
+        <div className="bg-white rounded-[2.5rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.05)] p-10 w-full max-w-[440px] border border-slate-100 relative overflow-hidden">
+           
+           <div className="text-center mb-8 space-y-1">
+              <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Secure Sign In</h2>
+              <p className="text-[11px] font-bold text-slate-400">Access your personalized dashboard.</p>
+           </div>
 
-          <div className="space-y-2">
-            <div className="flex justify-between items-center ml-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Password</label>
-                <button type="button" onClick={handleForgotPassword} className="text-[10px] font-bold text-[#0090C1] hover:underline">
-                    {resetSent ? <span className="text-emerald-500 flex items-center gap-1"><Check size={10} /> Sent!</span> : 'Forgot Password?'}
-                </button>
-            </div>
-            <div className="relative group">
-              <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0090C1] transition-colors" size={20} />
-              <input 
-                type={showPassword ? "text" : "password"} 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full pl-14 pr-12 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-sky-500/10 focus:border-[#0090C1] transition-all font-bold text-slate-700 text-sm placeholder:font-medium placeholder:text-slate-300"
-              />
+           <form onSubmit={handleLogin} className="space-y-5">
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-3">Username / ID</label>
+                 <div className="relative group">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#2563eb] transition-colors">
+                       <User size={18} />
+                    </div>
+                    <input 
+                      type="text" 
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="e.g. _Iftu"
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:bg-white focus:border-blue-100 focus:ring-4 focus:ring-blue-500/5 transition-all font-bold text-slate-700 text-sm placeholder:text-slate-400 placeholder:font-medium"
+                    />
+                 </div>
+              </div>
+
+              <div className="space-y-2">
+                 <div className="flex justify-between items-center ml-3 mr-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Password</label>
+                    <button type="button" onClick={handleForgotPassword} className="text-[10px] font-bold text-[#2563eb] hover:underline">
+                        {resetSent ? <span className="text-emerald-500 flex items-center gap-1"><Check size={10} /> Sent</span> : 'Forgot Password?'}
+                    </button>
+                 </div>
+                 <div className="relative group">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#2563eb] transition-colors">
+                       <Lock size={18} />
+                    </div>
+                    <input 
+                      type={showPassword ? "text" : "password"} 
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full pl-12 pr-12 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:bg-white focus:border-blue-100 focus:ring-4 focus:ring-blue-500/5 transition-all font-bold text-slate-700 text-sm placeholder:text-slate-400 placeholder:font-medium"
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                 </div>
+              </div>
+
+              {error && (
+                <div className="flex items-center gap-2 p-3 bg-rose-50 border border-rose-100 rounded-xl text-rose-500 text-[11px] font-bold animate-in slide-in-from-top-1">
+                  <AlertCircle size={14} className="shrink-0" />
+                  {error}
+                </div>
+              )}
+
               <button 
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none p-1 rounded-full hover:bg-slate-100 transition-colors"
+                type="submit" 
+                disabled={isLoading || !username || !password}
+                className="w-full py-4 bg-gradient-to-r from-[#3b82f6] to-[#0090C1] hover:from-blue-600 hover:to-sky-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-4"
               >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                {isLoading ? (
+                   <>
+                     <Loader2 size={16} className="animate-spin" />
+                     Authenticating...
+                   </>
+                ) : (
+                   <>
+                     Access Portal <ArrowRight size={16} />
+                   </>
+                )}
               </button>
-            </div>
-          </div>
+           </form>
 
-          {error && (
-            <div className="flex items-center gap-3 p-4 bg-rose-50 text-rose-600 rounded-2xl text-xs font-bold animate-in slide-in-from-top-2 border border-rose-100">
-              <AlertCircle size={18} className="shrink-0" />
-              {error}
-            </div>
-          )}
+           <div className="mt-8 flex flex-col items-center gap-4">
+              <button 
+                 onClick={() => setShowInfo(!showInfo)}
+                 className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors"
+              >
+                 <HelpCircle size={12} /> Login Help & Credentials
+              </button>
 
-          <button 
-            type="submit" 
-            disabled={isLoading || !username || !password}
-            className="w-full py-4 bg-[#0090C1] text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-[#007ba6] transition-all shadow-xl shadow-sky-500/20 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3 group relative overflow-hidden"
-          >
-            {isLoading ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span className="animate-pulse">Verifying...</span>
-              </>
-            ) : (
-              <>
-                Access Portal <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-              </>
-            )}
-          </button>
-        </form>
+              {showInfo && (
+                 <div className="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2 animate-in fade-in slide-in-from-bottom-2">
+                    <CredentialRow role="Admin" user="_admin" pass="_admin123" color="text-sky-600" onClick={() => handleAutoFill('_admin', '_admin123')} />
+                    <CredentialRow role="Teacher" user="_teacher" pass="_teacher123" color="text-emerald-600" onClick={() => handleAutoFill('_teacher', '_teacher123')} />
+                    <CredentialRow role="Student" user="_Iftu" pass="_123456" color="text-indigo-600" onClick={() => handleAutoFill('_Iftu', '_123456')} />
+                 </div>
+              )}
 
-        <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col items-center gap-4">
-          <button 
-            onClick={() => setShowInfo(!showInfo)}
-            className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:text-[#0090C1] transition-colors group"
-          >
-            <HelpCircle size={14} className="group-hover:scale-110 transition-transform" />
-            Login Help & Credentials
-          </button>
-          
-          {showInfo && (
-            <div className="bg-slate-50 p-6 rounded-2xl w-full text-left space-y-3 border border-slate-100 animate-in fade-in slide-in-from-bottom-2 shadow-inner">
-               <div className="flex items-center justify-between">
-                 <span className="text-[10px] font-black text-[#0090C1] uppercase">Admin</span>
-                 <code className="text-[10px] text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">_admin / _admin123</code>
-               </div>
-               <div className="flex items-center justify-between">
-                 <span className="text-[10px] font-black text-emerald-500 uppercase">Teacher</span>
-                 <code className="text-[10px] text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">_teacher / _teacher123</code>
-               </div>
-               <div className="flex items-center justify-between">
-                 <span className="text-[10px] font-black text-indigo-500 uppercase">Student</span>
-                 <code className="text-[10px] text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">_Iftu / _123456</code>
-               </div>
-            </div>
-          )}
+              <div className="px-4 py-2 bg-sky-50 text-[#0090C1] rounded-full border border-sky-100 flex items-center gap-2">
+                 <ShieldCheck size={14} />
+                 <span className="text-[9px] font-black uppercase tracking-widest">Secure TLS Encryption</span>
+              </div>
+           </div>
 
-          <div className="flex items-center gap-2 text-[10px] font-black text-[#0090C1] uppercase tracking-[0.15em] bg-sky-50 px-6 py-2 rounded-full border border-sky-100 shadow-sm mt-2 opacity-80">
-            <ShieldCheck size={14} />
-            Secure TLS Encryption
-          </div>
         </div>
       </div>
     </div>
   );
 };
+
+const CredentialRow: React.FC<{ role: string, user: string, pass: string, color: string, onClick: () => void }> = ({ role, user, pass, color, onClick }) => (
+  <div 
+    onClick={onClick}
+    className="flex items-center justify-between bg-white p-2 px-3 rounded-xl border border-slate-100 hover:border-blue-200 cursor-pointer group transition-all"
+  >
+     <span className={`text-[10px] font-black uppercase ${color}`}>{role}</span>
+     <div className="flex items-center gap-2 text-[10px] font-mono text-slate-500">
+       <span>{user}</span>
+       <span className="text-slate-300">/</span>
+       <span>••••</span>
+       <ChevronRight size={10} className="text-slate-300 group-hover:text-blue-500" />
+     </div>
+  </div>
+);

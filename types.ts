@@ -1,8 +1,4 @@
 
-
-
-
-
 // Global Configuration Constants
 export const SOCIAL_LINKS = {
   TELEGRAM: 'https://t.me/jemal9056',
@@ -230,19 +226,14 @@ export interface StudentAcademicRecord {
 }
 
 declare global {
-  /**
-   * Defining AIStudio interface within the global scope to ensure consistent merging
-   * with existing environment declarations and avoid "Subsequent property declarations must have the same type" errors.
-   */
   interface AIStudio {
     hasSelectedApiKey: () => Promise<boolean>;
     openSelectKey: () => Promise<void>;
   }
 
   interface Window {
-    html2pdf: () => any;
+    html2pdf: any;
     webkitAudioContext: typeof AudioContext;
-    // Fix: Property 'aistudio' is made optional to align with other global declarations and resolve modifier mismatch errors.
     aistudio?: AIStudio;
   }
 }

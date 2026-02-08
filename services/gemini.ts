@@ -227,6 +227,24 @@ export class GeminiService {
     });
     return response.text || "Could not generate summary.";
   }
+
+  async analyzeGradebook(gradeData: string) {
+    const response = await this.ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `You are an academic data analyst. Analyze this gradebook data summary. 
+      
+      Provide a brief, professional report covering:
+      1. **Overall Performance**: General class average and trends.
+      2. **Areas for Improvement**: Which subjects or semesters seem harder?
+      3. **At-Risk Students**: Identify students (by ID) with averages below 50 who need intervention.
+      4. **Top Performers**: Acknowledge students with high averages (>90).
+      
+      Keep it concise. Use Markdown.
+      Data: ${gradeData}`,
+      config: { thinkingConfig: { thinkingBudget: 0 } }
+    });
+    return response.text;
+  }
 }
 
 export const geminiService = new GeminiService();

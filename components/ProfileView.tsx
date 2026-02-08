@@ -119,7 +119,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate }) => {
 
       {/* Tabs */}
       <div className="flex gap-4 p-1.5 bg-slate-100 rounded-2xl w-fit border border-slate-200">
-         {(['Account', ...(user.role === 'Admin' ? ['Branding'] : []), 'Security'] as const).map(tab => (
+         {/* Fix: use filter instead of conditional spread to preserve literal types for setActiveTab */}
+         {(['Account', 'Branding', 'Security'] as const).filter(tab => tab !== 'Branding' || user.role === 'Admin').map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-white text-[#0090C1] shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>
                {tab}
             </button>
@@ -178,7 +179,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate }) => {
                    </div>
                  </div>
                  <button type="submit" disabled={isSaving} className="px-10 py-5 bg-[#0090C1] text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-sky-500/20 hover:bg-[#007ba6] transition-all flex items-center justify-center gap-3">
-                    {/* Fix: Added import for Loader2 */}
                     {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />} Update Credentials
                  </button>
               </form>
@@ -219,7 +219,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdate }) => {
                           </div>
                        </div>
                        <button type="submit" disabled={isSaving} className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-2xl hover:bg-black transition-all">
-                          {/* Fix: Added import for Loader2 */}
                           {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Palette size={18} />} Apply Global Branding
                        </button>
                     </form>
